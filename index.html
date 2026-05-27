@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Drink Slider</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Arial Black', sans-serif;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+    background: #C85A0A;
+  }
+
+  /* 배경 */
+  #bg {
+    position: fixed;
+    inset: 0;
+    transition: background-color 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+    background-color: #C85A0A;
+    z-index: 0;
+  }
+
+  /* Three.js 캔버스 */
+  #three-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* UI 레이어 */
+  .ui {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* 제품명 */
+  .product-name {
+    position: absolute;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: clamp(52px, 9vw, 108px);
+    font-weight: 900;
+    color: rgba(255,255,255,0.13);
+    letter-spacing: 0.15em;
+    white-space: nowrap;
+    text-transform: uppercase;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  /* 태그라인 */
+  .tagline {
+    position: absolute;
+    bottom: 20%;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* 네비게이션 버튼 */
+  .nav-buttons {
+    position: absolute;
+    bottom: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    pointer-events: all;
+  }
+
+  .nav-btn {
+    padding: 11px 26px;
+    border: 2px solid rgba(255,255,255,0.4);
+    background: transparent;
+    color: rgba(255,255,255,0.6);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 30px;
+    transition: all 0.3s ease;
+    font-family: inherit;
+  }
+
+  .nav-btn:hover {
+    border-color: rgba(255,255,255,0.9);
+    color: white;
+    background: rgba(255,255,255,0.1);
+  }
+
+  .nav-btn.active {
+    background: rgba(255,255,255,0.92);
+    color: #333;
+    border-color: transparent;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.2);
+  }
+
+  /* 좌우 화살표 */
+  .arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 50px;
+    height: 50px;
+    border: 2px solid rgba(255,255,255,0.45);
+    border-radius: 50%;
+    background: transparent;
+    color: white;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    pointer-events: all;
+  }
+
+  .arrow:hover {
+    background: rgba(255,255,255,0.2);
+    border-color: white;
+  }
+
+  .arrow-left { left: 5%; }
+  .arrow-right { right: 5%; }
+
+  /* 인디케이터 */
+  .dots {
+    position: absolute;
+    bottom: 4%;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.35);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    pointer-events: all;
+  }
+
+  .dot.active {
+    background: white;
+    width: 24px;
+    border-radius: 3px;
+  }
+
+  /* 텍스트 애니메이션 */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  .animating { animation: fadeUp 0.5s ease forwards; }
+
+  /* 로딩 */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 18px;
+    letter-spacing: 0.2em;
+    z-index: 99;
+    transition: opacity 0.5s ease;
+  }
+</style>
+</head>
+<body>
+
+<div id="bg"></div>
+<canvas id="three-canvas"></canvas>
+
+<div id="loading">LOADING...</div>
+
+<div class="ui">
+  <div class="product-name" id="productName">MANGORIA</div>
+  <div class="tagline" id="tagline">Tropical · Refreshing · Bold</div>
+
+  <button class="arrow arrow-left" onclick="changeSlide(-1)">‹</button>
+  <button class="arrow arrow-right" onclick="changeSlide(1)">›</button>
+
+  <div class="nav-buttons">
+    <button class="nav-btn active" onclick="goTo(0)">Mango</button>
+    <button class="nav-btn" onclick="goTo(1)">Dragon</button>
+    <button class="nav-btn" onclick="goTo(2)">Passion</button>
+    <button class="nav-btn" onclick="goTo(3)">Lime</button>
+  </div>
+
+  <div class="dots">
+    <div class="dot active" onclick="goTo(0)"></div>
+    <div class="dot" onclick="goTo(1)"></div>
+    <div class="dot" onclick="goTo(2)"></div>
+    <div class="dot" onclick="goTo(3)"></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+const flavors = [
+  { name: 'MANGORIA',  tagline: 'Tropical · Refreshing · Bold',   bg: '#C85A0A', label: 'images/라벨1.png' },
+  { name: 'DRACORE',   tagline: 'Exotic · Vibrant · Wild',         bg: '#A80E4E', label: 'images/라벨2.png' },
+  { name: 'PASSIONX',  tagline: 'Mysterious · Floral · Deep',      bg: '#4A1278', label: 'images/라벨3.png' },
+  { name: 'LICOZE',    tagline: 'Crisp · Tropical · Pure',         bg: '#155E2E', label: 'images/라벨4.png' }
+];
+
+let current = 0;
+let isAnimating = false;
+let canMesh = null;
+let topMesh = null;
+let bottomMesh = null;
+let rotSpeed = 0.0006; // rad/ms — 평상시 느린 회전
+
+// ── Three.js 셋업 ──
+const canvas = document.getElementById('three-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+camera.position.set(0, 1.8, 5);
+camera.lookAt(0, 0, 0);
+
+// 조명 — 메탈 재질에 최적화
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // 어둡게 → 메탈 대비 살림
+scene.add(ambientLight);
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+keyLight.position.set(3, 4, 5);
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0x88aaff, 0.5); // 차가운 블루 fill → 알루미늄 느낌
+fillLight.position.set(-4, 1, 3);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.8); // 뒤에서 강한 rim → 메탈 윤곽
+rimLight.position.set(0, 0, -5);
+scene.add(rimLight);
+
+const topLight = new THREE.DirectionalLight(0xffffff, 0.6);
+topLight.position.set(0, 6, 2);
+scene.add(topLight);
+
+// 캔 생성
+const CAN_R = 0.72;
+const CAN_H = 2.4;
+const SEG = 128;
+
+// 라벨 텍스처 로더
+const loader = new THREE.TextureLoader();
+
+function createCan(textureUrl, onReady) {
+  loader.load(textureUrl, (tex) => {
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(1, 1);
+
+    // 캔 몸통
+    const geo = new THREE.CylinderGeometry(CAN_R, CAN_R, CAN_H, SEG, 1, true);
+    const mat = new THREE.MeshPhongMaterial({
+      map: tex,
+      shininess: 80,
+      specular: new THREE.Color(0x444444),
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+
+    // 윗뚜껑 (금속)
+    const topGeo = new THREE.CylinderGeometry(CAN_R * 0.85, CAN_R, 0.12, SEG);
+    const metalMat = new THREE.MeshPhongMaterial({
+      color: 0xcccccc,
+      shininess: 200,
+      specular: new THREE.Color(0xffffff),
+    });
+    const topMesh = new THREE.Mesh(topGeo, metalMat);
+    topMesh.position.y = CAN_H / 2 + 0.06;
+
+    // 아랫뚜껑 (금속)
+    const botGeo = new THREE.CylinderGeometry(CAN_R, CAN_R * 0.9, 0.1, SEG);
+    const botMesh = new THREE.Mesh(botGeo, metalMat.clone());
+    botMesh.position.y = -(CAN_H / 2 + 0.05);
+
+    // 탭 (당기는 부분)
+    const tabGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.06, 16);
+    const tabMesh = new THREE.Mesh(tabGeo, metalMat.clone());
+    tabMesh.position.set(0.25, CAN_H / 2 + 0.15, 0);
+
+    const group = new THREE.Group();
+    group.add(mesh, topMesh, botMesh, tabMesh);
+    onReady(group, tex);
+  });
+}
+
+// 텍스처 미리 로드
+const textures = new Array(4).fill(null);
+let loadedCount = 0;
+
+flavors.forEach((f, i) => {
+  loader.load(f.label, (tex) => {
+    tex.wrapS = THREE.RepeatWrapping;
+    tex.repeat.set(1, 1);
+    textures[i] = tex;
+    loadedCount++;
+    if (loadedCount === flavors.length) initCan();
+  });
+});
+
+let canGroup = null;
+
+function initCan() {
+  // ── 금속 재질 (알루미늄 캔) ──
+  // 어두운 베이스 + 밝은 스펙큘러 = 메탈 특유의 대비감
+  const metalMat = new THREE.MeshPhongMaterial({
+    color: 0x6e6e6e,      // 어두운 베이스
+    shininess: 300,        // 매우 날카로운 하이라이트
+    specular: new THREE.Color(0xffffff),
+  });
+
+  // ── 캔 몸통 (금속 베이스) ──
+  const bodyGeo = new THREE.CylinderGeometry(CAN_R, CAN_R, CAN_H, SEG, 1, true);
+  const bodyMesh = new THREE.Mesh(bodyGeo, metalMat.clone());
+
+  // ── 라벨 스티커 (캔 몸통 전체 커버) ──
+  const labelH = CAN_H;  // 몸통 전체 높이
+  const labelGeo = new THREE.CylinderGeometry(CAN_R + 0.003, CAN_R + 0.003, labelH, SEG, 1, true);
+  const labelMat = new THREE.MeshPhongMaterial({
+    map: textures[0],
+    shininess: 8,
+    specular: new THREE.Color(0x0a0a0a),
+    transparent: true,
+    alphaTest: 0.05,
+  });
+  canMesh = new THREE.Mesh(labelGeo, labelMat); // 텍스처 교체 타깃
+
+  // ── 상단 넥 (좁아지는 목) ──
+  topMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(CAN_R * 0.68, CAN_R, 0.28, SEG),
+    metalMat.clone()
+  );
+  topMesh.position.y = CAN_H / 2 + 0.14;
+
+  // ── 뚜껑 판 (알루미늄 원형 lid) ──
+  const lidMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(CAN_R * 0.68, CAN_R * 0.68, 0.055, SEG),
+    metalMat.clone()
+  );
+  lidMesh.position.y = CAN_H / 2 + 0.308;
+
+  // ── 스코어 링 (뚜껑 각인선) ──
+  const scoreMesh = new THREE.Mesh(
+    new THREE.TorusGeometry(CAN_R * 0.38, 0.013, 6, 52),
+    new THREE.MeshPhongMaterial({ color: 0x909090, shininess: 80 })
+  );
+  scoreMesh.rotation.x = Math.PI / 2;
+  scoreMesh.position.y = CAN_H / 2 + 0.338;
+
+  // ── 리벳 (탭 고정 돌기) ──
+  const rivetMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.038, 0.042, 0.045, 14),
+    new THREE.MeshPhongMaterial({ color: 0xaaaaaa, shininess: 220, specular: new THREE.Color(0xffffff) })
+  );
+  rivetMesh.position.set(0.10, CAN_H / 2 + 0.342, 0);
+
+  // ── 탭 (뚜껑 위에 평평하게 누운 형태) ──
+  const tabMesh = new THREE.Mesh(
+    new THREE.BoxGeometry(0.32, 0.036, 0.10),
+    metalMat.clone()
+  );
+  tabMesh.position.set(0.12, CAN_H / 2 + 0.342, 0);
+
+  // ── 탭 링 (수평으로 누운 링) ──
+  const ringMesh = new THREE.Mesh(
+    new THREE.TorusGeometry(0.092, 0.022, 10, 26),
+    metalMat.clone()
+  );
+  ringMesh.rotation.x = Math.PI / 2; // 수평
+  ringMesh.position.set(0.34, CAN_H / 2 + 0.344, 0);
+
+  // ── 아랫뚜껑 ──
+  bottomMesh = new THREE.Mesh(
+    new THREE.CylinderGeometry(CAN_R, CAN_R * 0.88, 0.10, SEG),
+    metalMat.clone()
+  );
+  bottomMesh.position.y = -(CAN_H / 2 + 0.05);
+
+  canGroup = new THREE.Group();
+  canGroup.add(bodyMesh, canMesh, topMesh, lidMesh, scoreMesh, rivetMesh, tabMesh, ringMesh, bottomMesh);
+  canGroup.position.y = -0.1;
+  scene.add(canGroup);
+
+  // 로딩 숨기기
+  const loadingEl = document.getElementById('loading');
+  loadingEl.style.opacity = '0';
+  setTimeout(() => loadingEl.style.display = 'none', 500);
+
+  animate();
+}
+
+// 배경 ref
+const bgEl = document.getElementById('bg');
+bgEl.style.backgroundColor = flavors[0].bg;
+
+// 텍스트 refs
+const productName = document.getElementById('productName');
+const tagline = document.getElementById('tagline');
+const navBtns = document.querySelectorAll('.nav-btn');
+const dots = document.querySelectorAll('.dot');
+
+// ── 슬라이드 전환 ──
+function goTo(index) {
+  if (isAnimating || index === current) return;
+  isAnimating = true;
+
+  let textureSwapped = false;
+  const fastSpeed = rotSpeed * 25; // 전환 시 25배 빠르게
+  let rotated = 0;
+  const halfTurn = Math.PI; // 반바퀴에서 교체
+  const fullTurn = Math.PI * 2; // 한바퀴 돌면 완료
+  let lastT = null;
+
+  function spinStep(now) {
+    if (lastT === null) lastT = now;
+    const dt = Math.min(now - lastT, 50);
+    lastT = now;
+
+    const step = fastSpeed * dt;
+    canGroup.rotation.y += step;
+    rotated += step;
+
+    // 반바퀴 지점에서 교체
+    if (!textureSwapped && rotated >= halfTurn) {
+      textureSwapped = true;
+      canMesh.material.map = textures[index];
+      canMesh.material.needsUpdate = true;
+      bgEl.style.backgroundColor = flavors[index].bg;
+      productName.textContent = flavors[index].name;
+      tagline.textContent = flavors[index].tagline;
+      productName.classList.add('animating');
+      tagline.classList.add('animating');
+      setTimeout(() => {
+        productName.classList.remove('animating');
+        tagline.classList.remove('animating');
+      }, 500);
+      navBtns.forEach((b, i) => b.classList.toggle('active', i === index));
+      dots.forEach((d, i) => d.classList.toggle('active', i === index));
+      current = index;
+    }
+
+    if (rotated < fullTurn) {
+      requestAnimationFrame(spinStep);
+    } else {
+      isAnimating = false;
+    }
+  }
+
+  requestAnimationFrame(spinStep);
+}
+
+function changeSlide(dir) {
+  goTo((current + dir + flavors.length) % flavors.length);
+}
+
+// ── 연속 느린 회전 ──
+let lastTime = 0;
+
+function animate(time = 0) {
+  requestAnimationFrame(animate);
+  const dt = Math.min(time - lastTime, 50);
+  lastTime = time;
+
+  if (canGroup) {
+    canGroup.rotation.y += rotSpeed * dt;
+  }
+
+  renderer.render(scene, camera);
+}
+
+// 리사이즈
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// 키보드
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowLeft') changeSlide(-1);
+  if (e.key === 'ArrowRight') changeSlide(1);
+});
+
+// 스와이프
+let touchStartX = 0;
+document.addEventListener('touchstart', e => { touchStartX = e.touches[0].clientX; });
+document.addEventListener('touchend', e => {
+  const diff = touchStartX - e.changedTouches[0].clientX;
+  if (Math.abs(diff) > 50) changeSlide(diff > 0 ? 1 : -1);
+});
+</script>
+</body>
+</html>
